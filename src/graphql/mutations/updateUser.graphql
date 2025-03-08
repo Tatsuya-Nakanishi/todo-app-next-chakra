@@ -1,0 +1,8 @@
+mutation UpdateUser($id: String!, $name: String!) {
+  updateUser(id: $id, name: $name) {
+    id
+    name
+    firebaseUId
+    updatedAt
+  }
+} 

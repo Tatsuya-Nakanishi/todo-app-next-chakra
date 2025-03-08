@@ -1,0 +1,9 @@
+query GetUser($id: String!) {
+  user(id: $id) {
+    id
+    name
+    firebaseUId
+    createdAt
+    updatedAt
+  }
+} 

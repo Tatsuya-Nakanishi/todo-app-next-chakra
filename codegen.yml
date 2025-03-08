@@ -1,0 +1,22 @@
+overwrite: true
+schema: 'http://localhost:4000/graphql'
+documents: 'src/**/*.graphql'
+generates:
+  src/generated/fragment-matcher.ts:
+    plugins:
+      - 'fragment-matcher'
+  src/generated/graphql.ts:
+    plugins:
+      - 'typescript'
+      - 'typescript-operations'
+      - 'typescript-react-apollo'
+    config:
+      skipTypeNameForRoot: true
+      skipTypename: true
+      inlineFragmentTypes: 'combine'
+  src/generated/mocks.ts:
+    plugins:
+      - typescript-mock-data:
+          addTypename: true
+          typesFile: './graphql.ts'
+          terminateCircularRelationships: true

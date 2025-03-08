@@ -1,0 +1,8 @@
+mutation UpdateTodoContent($id: String!, $title: String!, $description: String!) {
+  updateTodoContent(id: $id, title: $title, description: $description) {
+    id
+    title
+    description
+    updatedAt
+  }
+} 

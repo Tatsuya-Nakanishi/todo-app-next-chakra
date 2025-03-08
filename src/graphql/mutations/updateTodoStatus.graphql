@@ -1,0 +1,7 @@
+mutation UpdateTodoStatus($input: UpdateTodoStatusInput!) {
+  updateTodoStatus(input: $input) {
+    id
+    status
+    updatedAt
+  }
+} 

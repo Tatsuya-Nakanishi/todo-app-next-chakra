@@ -1,0 +1,9 @@
+mutation CreateUser($name: String!, $uid: String!) {
+  createUser(name: $name, uid: $uid) {
+    id
+    name
+    firebaseUId
+    createdAt
+    updatedAt
+  }
+} 
