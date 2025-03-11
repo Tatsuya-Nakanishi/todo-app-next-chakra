@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/router';
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/router";
 import {
   Box,
   Button,
@@ -14,22 +14,31 @@ import {
   useToast,
   Container,
   FormErrorMessage,
-} from '@chakra-ui/react';
-import NextLink from 'next/link';
-import { useForm } from 'react-hook-form';
-import * as yup from 'yup';
-import { yupResolver } from '@hookform/resolvers/yup';
+} from "@chakra-ui/react";
+import NextLink from "next/link";
+import { useForm } from "react-hook-form";
+import * as yup from "yup";
+import { yupResolver } from "@hookform/resolvers/yup";
 
 // バリデーションスキーマ
 const schema = yup.object({
-  email: yup.string().email('有効なメールアドレスを入力してください').required('メールアドレスは必須です'),
-  password: yup.string().required('パスワードは必須です').min(6, 'パスワードは6文字以上である必要があります'),
-  confirmPassword: yup.string()
-    .oneOf([yup.ref('password')], 'パスワードが一致しません')
-    .required('パスワード（確認）は必須です'),
+  name: yup.string().required("名前は必須です"),
+  email: yup
+    .string()
+    .email("有効なメールアドレスを入力してください")
+    .required("メールアドレスは必須です"),
+  password: yup
+    .string()
+    .required("パスワードは必須です")
+    .min(6, "パスワードは6文字以上である必要があります"),
+  confirmPassword: yup
+    .string()
+    .oneOf([yup.ref("password")], "パスワードが一致しません")
+    .required("パスワード（確認）は必須です"),
 });
 
 type SignupFormData = {
+  name: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -40,7 +49,7 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const toast = useToast();
   const router = useRouter();
-  
+
   const {
     register,
     handleSubmit,
@@ -52,24 +61,24 @@ export default function Signup() {
   const onSubmit = async (data: SignupFormData) => {
     try {
       setLoading(true);
-      await signup(data.email, data.password);
+      await signup(data.email, data.password, data.name);
       toast({
-        title: 'アカウント作成成功',
-        description: 'アカウントが正常に作成されました',
-        status: 'success',
+        title: "アカウント作成成功",
+        description: "アカウントが正常に作成されました",
+        status: "success",
         duration: 3000,
         isClosable: true,
       });
-      router.push('/dashboard');
+      router.push("/login");
     } catch (error: any) {
-      let message = 'アカウント作成に失敗しました';
-      if (error.code === 'auth/email-already-in-use') {
-        message = 'このメールアドレスは既に使用されています';
+      let message = "アカウント作成に失敗しました";
+      if (error.code === "auth/email-already-in-use") {
+        message = "このメールアドレスは既に使用されています";
       }
       toast({
-        title: 'エラー',
+        title: "エラー",
         description: message,
-        status: 'error',
+        status: "error",
         duration: 5000,
         isClosable: true,
       });
@@ -84,36 +93,44 @@ export default function Signup() {
         <Heading textAlign="center">新規登録</Heading>
         <Box as="form" onSubmit={handleSubmit(onSubmit)}>
           <VStack spacing={4}>
+            <FormControl isInvalid={!!errors.name}>
+              <FormLabel>名前</FormLabel>
+              <Input placeholder="山田 太郎" {...register("name")} />
+              <FormErrorMessage>{errors.name?.message}</FormErrorMessage>
+            </FormControl>
+
             <FormControl isInvalid={!!errors.email}>
               <FormLabel>メールアドレス</FormLabel>
               <Input
                 type="email"
                 placeholder="your-email@example.com"
-                {...register('email')}
+                {...register("email")}
               />
               <FormErrorMessage>{errors.email?.message}</FormErrorMessage>
             </FormControl>
-            
+
             <FormControl isInvalid={!!errors.password}>
               <FormLabel>パスワード</FormLabel>
               <Input
                 type="password"
                 placeholder="******"
-                {...register('password')}
+                {...register("password")}
               />
               <FormErrorMessage>{errors.password?.message}</FormErrorMessage>
             </FormControl>
-            
+
             <FormControl isInvalid={!!errors.confirmPassword}>
               <FormLabel>パスワード（確認）</FormLabel>
               <Input
                 type="password"
                 placeholder="******"
-                {...register('confirmPassword')}
+                {...register("confirmPassword")}
               />
-              <FormErrorMessage>{errors.confirmPassword?.message}</FormErrorMessage>
+              <FormErrorMessage>
+                {errors.confirmPassword?.message}
+              </FormErrorMessage>
             </FormControl>
-            
+
             <Button
               colorScheme="teal"
               width="full"
@@ -125,9 +142,9 @@ export default function Signup() {
             </Button>
           </VStack>
         </Box>
-        
+
         <Text textAlign="center">
-          既にアカウントをお持ちの方は{' '}
+          既にアカウントをお持ちの方は{" "}
           <Link as={NextLink} href="/login" color="teal.500">
             ログイン
           </Link>
@@ -135,4 +152,4 @@ export default function Signup() {
       </VStack>
     </Container>
   );
-} 
+}
