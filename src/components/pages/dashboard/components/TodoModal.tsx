@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   Modal,
   ModalOverlay,
@@ -14,10 +14,10 @@ import {
   Textarea,
   Select,
   HStack,
-  useToast
-} from '@chakra-ui/react';
-import { TodoStatus } from '@/generated/graphql';
-import { Todo } from '@/hooks/useTodos';
+  useToast,
+} from "@chakra-ui/react";
+import { TodoStatus } from "@/generated/graphql";
+import { Todo } from "@/hooks/useTodos";
 
 interface TodoModalProps {
   isOpen: boolean;
@@ -27,9 +27,15 @@ interface TodoModalProps {
   onDelete?: (id: string) => Promise<void>;
 }
 
-export default function TodoModal({ isOpen, onClose, todo, onSave, onDelete }: TodoModalProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+export default function TodoModal({
+  isOpen,
+  onClose,
+  todo,
+  onSave,
+  onDelete,
+}: TodoModalProps) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TodoStatus>(TodoStatus.NotStarted);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const toast = useToast();
@@ -40,8 +46,8 @@ export default function TodoModal({ isOpen, onClose, todo, onSave, onDelete }: T
       setDescription(todo.description);
       setStatus(todo.status);
     } else {
-      setTitle('');
-      setDescription('');
+      setTitle("");
+      setDescription("");
       setStatus(TodoStatus.NotStarted);
     }
   }, [todo]);
@@ -49,8 +55,8 @@ export default function TodoModal({ isOpen, onClose, todo, onSave, onDelete }: T
   const handleSubmit = async () => {
     if (!title.trim()) {
       toast({
-        title: 'タイトルを入力してください',
-        status: 'error',
+        title: "タイトルを入力してください",
+        status: "error",
         duration: 3000,
         isClosable: true,
       });
@@ -65,11 +71,11 @@ export default function TodoModal({ isOpen, onClose, todo, onSave, onDelete }: T
           id: todo.id,
           title,
           description,
-          status
+          status,
         });
         toast({
-          title: 'タスクを更新しました',
-          status: 'success',
+          title: "タスクを更新しました",
+          status: "success",
           duration: 3000,
           isClosable: true,
         });
@@ -78,21 +84,34 @@ export default function TodoModal({ isOpen, onClose, todo, onSave, onDelete }: T
         await onSave({
           title,
           description,
-          status
+          status,
         });
         toast({
-          title: 'タスクを作成しました',
-          status: 'success',
+          title: "タスクを作成しました",
+          status: "success",
           duration: 3000,
           isClosable: true,
         });
       }
       onClose();
     } catch (error) {
+      // エラーの詳細を表示
+      const errorMessage =
+        error instanceof Error ? error.message : "不明なエラー";
+      console.error("Error in TodoModal:", errorMessage);
+
+      // エラーメッセージを分析して適切なタイトルを表示
+      let title = "エラーが発生しました";
+      if (errorMessage.includes("認証エラー")) {
+        title = "認証エラー";
+      } else if (errorMessage.includes("GraphQLエラー")) {
+        title = "GraphQLエラー";
+      }
+
       toast({
-        title: 'エラーが発生しました',
-        description: error instanceof Error ? error.message : '不明なエラー',
-        status: 'error',
+        title: title,
+        description: errorMessage,
+        status: "error",
         duration: 5000,
         isClosable: true,
       });
@@ -103,22 +122,22 @@ export default function TodoModal({ isOpen, onClose, todo, onSave, onDelete }: T
 
   const handleDelete = async () => {
     if (!todo) return;
-    
+
     setIsSubmitting(true);
     try {
       await onDelete!(todo.id);
       toast({
-        title: 'タスクを削除しました',
-        status: 'success',
+        title: "タスクを削除しました",
+        status: "success",
         duration: 3000,
         isClosable: true,
       });
       onClose();
     } catch (error) {
       toast({
-        title: 'エラーが発生しました',
-        description: error instanceof Error ? error.message : '不明なエラー',
-        status: 'error',
+        title: "エラーが発生しました",
+        description: error instanceof Error ? error.message : "不明なエラー",
+        status: "error",
         duration: 5000,
         isClosable: true,
       });
@@ -131,30 +150,30 @@ export default function TodoModal({ isOpen, onClose, todo, onSave, onDelete }: T
     <Modal isOpen={isOpen} onClose={onClose} size="md">
       <ModalOverlay />
       <ModalContent>
-        <ModalHeader>{todo ? 'タスクの編集' : '新規タスク作成'}</ModalHeader>
+        <ModalHeader>{todo ? "タスクの編集" : "新規タスク作成"}</ModalHeader>
         <ModalCloseButton />
         <ModalBody>
           <FormControl mb={4} isRequired>
             <FormLabel>タイトル</FormLabel>
-            <Input 
-              value={title} 
-              onChange={(e) => setTitle(e.target.value)} 
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               placeholder="タスクのタイトルを入力"
             />
           </FormControl>
           <FormControl mb={4}>
             <FormLabel>説明</FormLabel>
-            <Textarea 
-              value={description} 
-              onChange={(e) => setDescription(e.target.value)} 
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               placeholder="タスクの詳細を入力"
               rows={4}
             />
           </FormControl>
           <FormControl>
             <FormLabel>ステータス</FormLabel>
-            <Select 
-              value={status} 
+            <Select
+              value={status}
               onChange={(e) => setStatus(e.target.value as TodoStatus)}
             >
               <option value={TodoStatus.NotStarted}>未対応</option>
@@ -167,9 +186,9 @@ export default function TodoModal({ isOpen, onClose, todo, onSave, onDelete }: T
         <ModalFooter>
           <HStack spacing={2}>
             {todo && onDelete && (
-              <Button 
-                colorScheme="red" 
-                onClick={handleDelete} 
+              <Button
+                colorScheme="red"
+                onClick={handleDelete}
                 isLoading={isSubmitting}
               >
                 削除
@@ -178,16 +197,16 @@ export default function TodoModal({ isOpen, onClose, todo, onSave, onDelete }: T
             <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
               キャンセル
             </Button>
-            <Button 
-              colorScheme="blue" 
-              onClick={handleSubmit} 
+            <Button
+              colorScheme="blue"
+              onClick={handleSubmit}
               isLoading={isSubmitting}
             >
-              {todo ? '更新' : '作成'}
+              {todo ? "更新" : "作成"}
             </Button>
           </HStack>
         </ModalFooter>
       </ModalContent>
     </Modal>
   );
-} 
+}

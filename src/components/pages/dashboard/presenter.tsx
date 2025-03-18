@@ -1,20 +1,19 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Box,
   Flex,
   Heading,
-  Text,
   Button,
   useDisclosure,
   Badge,
   SimpleGrid,
-} from '@chakra-ui/react';
-import { AddIcon } from '@chakra-ui/icons';
-import { TodoStatus } from '@/generated/graphql';
-import { useTodos } from '@/hooks/useTodos';
-import TodoModal from '@/components/pages/dashboard/components/TodoModal';
-import { 
-  DndContext, 
+} from "@chakra-ui/react";
+import { AddIcon } from "@chakra-ui/icons";
+import { TodoStatus } from "@/generated/graphql";
+import { useTodos } from "@/hooks/useTodos";
+import TodoModal from "@/components/pages/dashboard/components/TodoModal";
+import {
+  DndContext,
   DragOverlay,
   closestCorners,
   KeyboardSensor,
@@ -24,31 +23,42 @@ import {
   DragStartEvent,
   DragEndEvent,
   DragOverEvent,
-  UniqueIdentifier
-} from '@dnd-kit/core';
-import { 
-  SortableContext, 
+  UniqueIdentifier,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
   sortableKeyboardCoordinates,
-  verticalListSortingStrategy
-} from '@dnd-kit/sortable';
-import { SortableTodoItem } from '@/components/pages/dashboard/components/SortableTodoItem';
-import { TodoItem } from '@/components/pages/dashboard/components/TodoItem';
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { SortableTodoItem } from "@/components/pages/dashboard/components/SortableTodoItem";
+import { TodoItem } from "@/components/pages/dashboard/components/TodoItem";
 
 // カラムのID定義
 const COLUMN_IDS = {
-  NOT_STARTED: 'NOT_STARTED',
-  IN_PROGRESS: 'IN_PROGRESS',
-  COMPLETED: 'COMPLETED',
+  NOT_STARTED: "NOT_STARTED",
+  IN_PROGRESS: "IN_PROGRESS",
+  COMPLETED: "COMPLETED",
 };
 
 export default function DashboardPresenter() {
-  const { todos, loading, updateTodoStatus, createTodo, updateTodo, deleteTodo } = useTodos();
+  const {
+    todos,
+    loading,
+    updateTodoStatus,
+    createTodo,
+    updateTodo,
+    deleteTodo,
+  } = useTodos();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [selectedTodo, setSelectedTodo] = useState<any>(null);
-  const [activeTodoId, setActiveTodoId] = useState<UniqueIdentifier | null>(null);
+  const [activeTodoId, setActiveTodoId] = useState<UniqueIdentifier | null>(
+    null
+  );
 
   // ドラッグ中のTodoを取得
-  const activeTodo = activeTodoId ? todos.find(todo => todo.id === activeTodoId) : null;
+  const activeTodo = activeTodoId
+    ? todos.find((todo) => todo.id === activeTodoId)
+    : null;
 
   // センサーの設定
   const sensors = useSensors(
@@ -71,23 +81,23 @@ export default function DashboardPresenter() {
   // ドラッグ終了時の処理
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    
+
     setActiveTodoId(null);
-    
+
     // ドロップ先がない場合は何もしない
     if (!over) return;
-    
+
     // 同じ要素にドロップした場合は何もしない
     if (active.id === over.id) return;
-    
+
     // ドロップ先のカラムIDを取得
     const overId = String(over.id);
-    
+
     // カラムにドロップした場合
     if (Object.values(COLUMN_IDS).includes(overId)) {
       const todoId = String(active.id);
       let newStatus: TodoStatus;
-      
+
       // ステータスの変換
       switch (overId) {
         case COLUMN_IDS.NOT_STARTED:
@@ -102,28 +112,28 @@ export default function DashboardPresenter() {
         default:
           return;
       }
-      
+
       // ステータス更新
       await updateTodoStatus(todoId, newStatus);
     }
   };
-  
+
   // ドラッグオーバー時の処理
   const handleDragOver = (event: DragOverEvent) => {
     const { active, over } = event;
-    
+
     // ドロップ先がない場合は何もしない
     if (!over) return;
-    
+
     // 同じ要素の場合は何もしない
     if (active.id === over.id) return;
-    
+
     // ドロップ先のカラムIDを取得
     const overId = String(over.id);
-    
+
     // 別のTodoアイテムの上にドラッグした場合
     if (!Object.values(COLUMN_IDS).includes(overId)) {
-      const overTodo = todos.find(todo => todo.id === overId);
+      const overTodo = todos.find((todo) => todo.id === overId);
       if (overTodo) {
         // ドラッグ中のTodoのステータスを、ドロップ先のTodoのステータスに合わせる
         const todoId = String(active.id);
@@ -143,21 +153,24 @@ export default function DashboardPresenter() {
   };
 
   // ステータスごとにタスクをフィルタリング
-  const notStartedTodos = todos?.filter(todo => todo.status === TodoStatus.NotStarted) || [];
-  const inProgressTodos = todos?.filter(todo => todo.status === TodoStatus.InProgress) || [];
-  const completedTodos = todos?.filter(todo => todo.status === TodoStatus.Completed) || [];
+  const notStartedTodos =
+    todos?.filter((todo) => todo.status === TodoStatus.NotStarted) || [];
+  const inProgressTodos =
+    todos?.filter((todo) => todo.status === TodoStatus.InProgress) || [];
+  const completedTodos =
+    todos?.filter((todo) => todo.status === TodoStatus.Completed) || [];
 
   // ステータスに応じた色を返す関数
   const getStatusColor = (status: TodoStatus) => {
     switch (status) {
       case TodoStatus.NotStarted:
-        return 'red';
+        return "red";
       case TodoStatus.InProgress:
-        return 'blue';
+        return "blue";
       case TodoStatus.Completed:
-        return 'green';
+        return "green";
       default:
-        return 'gray';
+        return "gray";
     }
   };
 
@@ -169,9 +182,9 @@ export default function DashboardPresenter() {
     <>
       <Flex justify="space-between" align="center" mb={6}>
         <Heading size="lg">タスク管理ボード</Heading>
-        <Button 
-          leftIcon={<AddIcon />} 
-          colorScheme="teal" 
+        <Button
+          leftIcon={<AddIcon />}
+          colorScheme="teal"
           onClick={handleAddTodo}
         >
           新規タスク作成
@@ -188,10 +201,10 @@ export default function DashboardPresenter() {
         >
           <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
             {/* 未対応カラム */}
-            <Box 
-              bg="gray.50" 
-              p={4} 
-              borderRadius="md" 
+            <Box
+              bg="gray.50"
+              p={4}
+              borderRadius="md"
               boxShadow="sm"
               id={COLUMN_IDS.NOT_STARTED}
               data-droppable
@@ -202,8 +215,8 @@ export default function DashboardPresenter() {
                 </Badge>
                 未対応
               </Heading>
-              <SortableContext 
-                items={notStartedTodos.map(todo => todo.id)} 
+              <SortableContext
+                items={notStartedTodos.map((todo) => todo.id)}
                 strategy={verticalListSortingStrategy}
                 id={COLUMN_IDS.NOT_STARTED}
               >
@@ -221,10 +234,10 @@ export default function DashboardPresenter() {
             </Box>
 
             {/* 作業中カラム */}
-            <Box 
-              bg="gray.50" 
-              p={4} 
-              borderRadius="md" 
+            <Box
+              bg="gray.50"
+              p={4}
+              borderRadius="md"
               boxShadow="sm"
               id={COLUMN_IDS.IN_PROGRESS}
               data-droppable
@@ -235,8 +248,8 @@ export default function DashboardPresenter() {
                 </Badge>
                 作業中
               </Heading>
-              <SortableContext 
-                items={inProgressTodos.map(todo => todo.id)} 
+              <SortableContext
+                items={inProgressTodos.map((todo) => todo.id)}
                 strategy={verticalListSortingStrategy}
                 id={COLUMN_IDS.IN_PROGRESS}
               >
@@ -254,10 +267,10 @@ export default function DashboardPresenter() {
             </Box>
 
             {/* 完了カラム */}
-            <Box 
-              bg="gray.50" 
-              p={4} 
-              borderRadius="md" 
+            <Box
+              bg="gray.50"
+              p={4}
+              borderRadius="md"
               boxShadow="sm"
               id={COLUMN_IDS.COMPLETED}
               data-droppable
@@ -268,8 +281,8 @@ export default function DashboardPresenter() {
                 </Badge>
                 完了
               </Heading>
-              <SortableContext 
-                items={completedTodos.map(todo => todo.id)} 
+              <SortableContext
+                items={completedTodos.map((todo) => todo.id)}
                 strategy={verticalListSortingStrategy}
                 id={COLUMN_IDS.COMPLETED}
               >
@@ -290,22 +303,19 @@ export default function DashboardPresenter() {
           {/* ドラッグ中のオーバーレイ */}
           <DragOverlay>
             {activeTodo ? (
-              <TodoItem
-                todo={activeTodo}
-                getStatusColor={getStatusColor}
-              />
+              <TodoItem todo={activeTodo} getStatusColor={getStatusColor} />
             ) : null}
           </DragOverlay>
         </DndContext>
       )}
 
-      <TodoModal 
-        isOpen={isOpen} 
-        onClose={onClose} 
+      <TodoModal
+        isOpen={isOpen}
+        onClose={onClose}
         todo={selectedTodo}
         onSave={selectedTodo ? updateTodo : createTodo}
         onDelete={selectedTodo ? deleteTodo : undefined}
       />
     </>
   );
-} 
+}
