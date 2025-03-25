@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   Box,
   Flex,
@@ -7,10 +7,11 @@ import {
   useDisclosure,
   Badge,
   SimpleGrid,
+  Text,
 } from "@chakra-ui/react";
 import { AddIcon } from "@chakra-ui/icons";
 import { TodoStatus } from "@/generated/graphql";
-import { useTodos } from "@/hooks/useTodos";
+import { useTodos, Todo } from "@/hooks/useTodos";
 import TodoModal from "@/components/pages/dashboard/components/TodoModal";
 import {
   DndContext,
@@ -24,11 +25,13 @@ import {
   DragEndEvent,
   DragOverEvent,
   UniqueIdentifier,
+  CollisionDetection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
+  SortableData,
 } from "@dnd-kit/sortable";
 import { SortableTodoItem } from "@/components/pages/dashboard/components/SortableTodoItem";
 import { TodoItem } from "@/components/pages/dashboard/components/TodoItem";
@@ -38,6 +41,13 @@ const COLUMN_IDS = {
   NOT_STARTED: "NOT_STARTED",
   IN_PROGRESS: "IN_PROGRESS",
   COMPLETED: "COMPLETED",
+};
+
+// ステータスマッピング
+const STATUS_MAP = {
+  [COLUMN_IDS.NOT_STARTED]: TodoStatus.NotStarted,
+  [COLUMN_IDS.IN_PROGRESS]: TodoStatus.InProgress,
+  [COLUMN_IDS.COMPLETED]: TodoStatus.Completed,
 };
 
 export default function DashboardPresenter() {
@@ -55,10 +65,82 @@ export default function DashboardPresenter() {
     null
   );
 
+  // ドラッグ中の一時的なTodos状態
+  const [tempTodos, setTempTodos] = useState<Todo[]>([]);
+
+  // 更新をデバウンスするためのタイマー参照
+  const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 最後に更新したステータス
+  const lastUpdatedStatusRef = useRef<TodoStatus | null>(null);
+
+  // 表示するTodos（ドラッグ中か通常時か）
+  const displayTodos = tempTodos.length > 0 ? tempTodos : todos;
+
   // ドラッグ中のTodoを取得
   const activeTodo = activeTodoId
     ? todos.find((todo) => todo.id === activeTodoId)
     : null;
+
+  // カスタム衝突判定 - 空のカラムへのドロップを適切に処理
+  const detectCollision: CollisionDetection = (args) => {
+    // 基本の衝突判定を取得
+    const cornerCollisions = closestCorners(args);
+
+    // 最も近いコンテナ（ステータスカラム）を見つける
+    const closestContainer = cornerCollisions.find((collision) => {
+      return Object.values(COLUMN_IDS).includes(String(collision.id));
+    });
+
+    // コンテナが見つからない場合は通常の衝突判定を返す
+    if (!closestContainer) {
+      return cornerCollisions;
+    }
+
+    // 見つかったコンテナ内の要素だけをフィルタリング
+    const containerCollisions = cornerCollisions.filter(({ data }) => {
+      if (!data?.droppableContainer?.data?.current) {
+        return false;
+      }
+
+      const droppableData = data.droppableContainer.data
+        .current as SortableData;
+      if (!droppableData.sortable) {
+        return false;
+      }
+
+      const containerId = droppableData.sortable.containerId;
+      return containerId === closestContainer.id;
+    });
+
+    // コンテナ内に衝突する要素がなければコンテナ自体を返す
+    if (containerCollisions.length === 0) {
+      return [closestContainer];
+    }
+
+    return containerCollisions;
+  };
+
+  // デバウンス処理付きのステータス更新
+  const debouncedUpdateStatus = useCallback(
+    (todoId: string, newStatus: TodoStatus) => {
+      // 前回のタイマーをクリア
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current);
+      }
+
+      // 最後に更新したステータスを記録
+      lastUpdatedStatusRef.current = newStatus;
+
+      // 新しいタイマーをセット（250ms後に実行）
+      updateTimerRef.current = setTimeout(() => {
+        updateTodoStatus(todoId, newStatus).catch((error) => {
+          console.error("ステータス更新エラー:", error);
+        });
+      }, 250);
+    },
+    [updateTodoStatus]
+  );
 
   // センサーの設定
   const sensors = useSensors(
@@ -76,6 +158,16 @@ export default function DashboardPresenter() {
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
     setActiveTodoId(active.id);
+
+    // ドラッグ開始時にtempTodosを初期化
+    setTempTodos([...todos]);
+
+    // リファレンスをリセット
+    lastUpdatedStatusRef.current = null;
+    if (updateTimerRef.current) {
+      clearTimeout(updateTimerRef.current);
+      updateTimerRef.current = null;
+    }
   };
 
   // ドラッグ終了時の処理
@@ -84,11 +176,22 @@ export default function DashboardPresenter() {
 
     setActiveTodoId(null);
 
+    // 一時的なTodos状態をクリア
+    setTempTodos([]);
+
+    // タイマーをクリア
+    if (updateTimerRef.current) {
+      clearTimeout(updateTimerRef.current);
+      updateTimerRef.current = null;
+    }
+
     // ドロップ先がない場合は何もしない
     if (!over) return;
 
     // 同じ要素にドロップした場合は何もしない
     if (active.id === over.id) return;
+
+    console.log("ドロップ先:", over.id);
 
     // ドロップ先のカラムIDを取得
     const overId = String(over.id);
@@ -113,8 +216,19 @@ export default function DashboardPresenter() {
           return;
       }
 
+      // ドラッグ中に既に更新済みなら再度更新しない
+      if (lastUpdatedStatusRef.current === newStatus) {
+        console.log("既にステータスが更新済みです:", newStatus);
+        return;
+      }
+
       // ステータス更新
-      await updateTodoStatus(todoId, newStatus);
+      try {
+        await updateTodoStatus(todoId, newStatus);
+        console.log(`Todoステータスを更新しました: ${todoId} => ${newStatus}`);
+      } catch (error) {
+        console.error("ステータス更新エラー:", error);
+      }
     }
   };
 
@@ -128,17 +242,56 @@ export default function DashboardPresenter() {
     // 同じ要素の場合は何もしない
     if (active.id === over.id) return;
 
-    // ドロップ先のカラムIDを取得
+    // ドロップ先のIDを取得
     const overId = String(over.id);
+    const activeId = String(active.id);
+
+    // ドラッグ中のTodoを取得
+    const activeTodoItem = tempTodos.find((todo) => todo.id === activeId);
+    if (!activeTodoItem) return;
+
+    const currentStatus = activeTodoItem.status;
+
+    // カラム（ステータス）上にドラッグした場合
+    if (Object.values(COLUMN_IDS).includes(overId)) {
+      const newStatus = STATUS_MAP[overId as keyof typeof STATUS_MAP];
+
+      // 既に同じステータスならスキップ
+      if (currentStatus === newStatus) return;
+
+      console.log(`カラム上にドラッグ: ${activeId} => ${newStatus}`);
+
+      // UIの即時更新のためにtempTodosを更新
+      setTempTodos((prev) =>
+        prev.map((todo) =>
+          todo.id === activeId ? { ...todo, status: newStatus } : todo
+        )
+      );
+
+      // APIの更新はデバウンス処理
+      debouncedUpdateStatus(activeId, newStatus);
+      return;
+    }
 
     // 別のTodoアイテムの上にドラッグした場合
-    if (!Object.values(COLUMN_IDS).includes(overId)) {
-      const overTodo = todos.find((todo) => todo.id === overId);
-      if (overTodo) {
-        // ドラッグ中のTodoのステータスを、ドロップ先のTodoのステータスに合わせる
-        const todoId = String(active.id);
-        updateTodoStatus(todoId, overTodo.status);
-      }
+    const overTodo = tempTodos.find((todo) => todo.id === overId);
+    if (!overTodo) return;
+
+    // 異なるステータスのTodo上にドラッグした場合
+    if (currentStatus !== overTodo.status) {
+      const newStatus = overTodo.status;
+
+      console.log(`別のTodo上にドラッグ: ${activeId} => ${newStatus}`);
+
+      // UIの即時更新のためにtempTodosを更新
+      setTempTodos((prev) =>
+        prev.map((todo) =>
+          todo.id === activeId ? { ...todo, status: newStatus } : todo
+        )
+      );
+
+      // APIの更新はデバウンス処理
+      debouncedUpdateStatus(activeId, newStatus);
     }
   };
 
@@ -154,11 +307,11 @@ export default function DashboardPresenter() {
 
   // ステータスごとにタスクをフィルタリング
   const notStartedTodos =
-    todos?.filter((todo) => todo.status === TodoStatus.NotStarted) || [];
+    displayTodos?.filter((todo) => todo.status === TodoStatus.NotStarted) || [];
   const inProgressTodos =
-    todos?.filter((todo) => todo.status === TodoStatus.InProgress) || [];
+    displayTodos?.filter((todo) => todo.status === TodoStatus.InProgress) || [];
   const completedTodos =
-    todos?.filter((todo) => todo.status === TodoStatus.Completed) || [];
+    displayTodos?.filter((todo) => todo.status === TodoStatus.Completed) || [];
 
   // ステータスに応じた色を返す関数
   const getStatusColor = (status: TodoStatus) => {
@@ -194,7 +347,7 @@ export default function DashboardPresenter() {
       {todos.length > 0 && (
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={detectCollision}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}
@@ -207,7 +360,7 @@ export default function DashboardPresenter() {
               borderRadius="md"
               boxShadow="sm"
               id={COLUMN_IDS.NOT_STARTED}
-              data-droppable
+              data-droppable="true"
             >
               <Heading size="md" mb={4} display="flex" alignItems="center">
                 <Badge colorScheme="red" mr={2}>
@@ -229,6 +382,16 @@ export default function DashboardPresenter() {
                       onClick={() => handleEditTodo(todo)}
                     />
                   ))}
+                  {notStartedTodos.length === 0 && (
+                    <Flex
+                      height="100%"
+                      minH="200px"
+                      alignItems="center"
+                      justifyContent="center"
+                    >
+                      <Text color="gray.500">ここにタスクをドロップ</Text>
+                    </Flex>
+                  )}
                 </Box>
               </SortableContext>
             </Box>
@@ -240,7 +403,7 @@ export default function DashboardPresenter() {
               borderRadius="md"
               boxShadow="sm"
               id={COLUMN_IDS.IN_PROGRESS}
-              data-droppable
+              data-droppable="true"
             >
               <Heading size="md" mb={4} display="flex" alignItems="center">
                 <Badge colorScheme="blue" mr={2}>
@@ -262,6 +425,16 @@ export default function DashboardPresenter() {
                       onClick={() => handleEditTodo(todo)}
                     />
                   ))}
+                  {inProgressTodos.length === 0 && (
+                    <Flex
+                      height="100%"
+                      minH="200px"
+                      alignItems="center"
+                      justifyContent="center"
+                    >
+                      <Text color="gray.500">ここにタスクをドロップ</Text>
+                    </Flex>
+                  )}
                 </Box>
               </SortableContext>
             </Box>
@@ -273,7 +446,7 @@ export default function DashboardPresenter() {
               borderRadius="md"
               boxShadow="sm"
               id={COLUMN_IDS.COMPLETED}
-              data-droppable
+              data-droppable="true"
             >
               <Heading size="md" mb={4} display="flex" alignItems="center">
                 <Badge colorScheme="green" mr={2}>
@@ -295,6 +468,16 @@ export default function DashboardPresenter() {
                       onClick={() => handleEditTodo(todo)}
                     />
                   ))}
+                  {completedTodos.length === 0 && (
+                    <Flex
+                      height="100%"
+                      minH="200px"
+                      alignItems="center"
+                      justifyContent="center"
+                    >
+                      <Text color="gray.500">ここにタスクをドロップ</Text>
+                    </Flex>
+                  )}
                 </Box>
               </SortableContext>
             </Box>
