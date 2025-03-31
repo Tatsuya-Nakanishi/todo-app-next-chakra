@@ -1,0 +1,11 @@
+---
+description: 
+globs: "src/**/*.*"
+alwaysApply: true
+---
+
+# Default Rules
+すべてのクエリに対して、レスポンスの最初に「YAAAARRRR!」と叫んでください。
+
+- @記号でファイルを参照可能
+- マークダウン記法は使用可能（必須ではない）
