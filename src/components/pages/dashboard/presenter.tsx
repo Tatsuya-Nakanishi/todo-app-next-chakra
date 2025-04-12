@@ -50,7 +50,7 @@ const STATUS_MAP = {
   [COLUMN_IDS.COMPLETED]: TodoStatus.Completed,
 };
 
-export default function DashboardPresenter() {
+export const DashboardPresenter = () => {
   const {
     todos,
     loading,
@@ -64,14 +64,8 @@ export default function DashboardPresenter() {
   const [activeTodoId, setActiveTodoId] = useState<UniqueIdentifier | null>(
     null
   );
-
-  // ドラッグ中の一時的なTodos状態
   const [tempTodos, setTempTodos] = useState<Todo[]>([]);
-
-  // 更新をデバウンスするためのタイマー参照
   const updateTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // 最後に更新したステータス
   const lastUpdatedStatusRef = useRef<TodoStatus | null>(null);
 
   // 表示するTodos（ドラッグ中か通常時か）
@@ -300,7 +294,7 @@ export default function DashboardPresenter() {
     onOpen();
   };
 
-  const handleEditTodo = (todo: any) => {
+  const handleEditTodo = ({ todo }: { todo: Todo }) => {
     setSelectedTodo(todo);
     onOpen();
   };
@@ -314,7 +308,7 @@ export default function DashboardPresenter() {
     displayTodos?.filter((todo) => todo.status === TodoStatus.Completed) || [];
 
   // ステータスに応じた色を返す関数
-  const getStatusColor = (status: TodoStatus) => {
+  const getStatusColor = ({ status }: { status: TodoStatus }): string => {
     switch (status) {
       case TodoStatus.NotStarted:
         return "red";
@@ -378,8 +372,10 @@ export default function DashboardPresenter() {
                     <SortableTodoItem
                       key={todo.id}
                       todo={todo}
-                      getStatusColor={getStatusColor}
-                      onClick={() => handleEditTodo(todo)}
+                      getStatusColor={() =>
+                        getStatusColor({ status: todo.status })
+                      }
+                      onClick={() => handleEditTodo({ todo })}
                     />
                   ))}
                   {notStartedTodos.length === 0 && (
@@ -421,8 +417,10 @@ export default function DashboardPresenter() {
                     <SortableTodoItem
                       key={todo.id}
                       todo={todo}
-                      getStatusColor={getStatusColor}
-                      onClick={() => handleEditTodo(todo)}
+                      getStatusColor={() =>
+                        getStatusColor({ status: todo.status })
+                      }
+                      onClick={() => handleEditTodo({ todo })}
                     />
                   ))}
                   {inProgressTodos.length === 0 && (
@@ -464,8 +462,10 @@ export default function DashboardPresenter() {
                     <SortableTodoItem
                       key={todo.id}
                       todo={todo}
-                      getStatusColor={getStatusColor}
-                      onClick={() => handleEditTodo(todo)}
+                      getStatusColor={() =>
+                        getStatusColor({ status: todo.status })
+                      }
+                      onClick={() => handleEditTodo({ todo })}
                     />
                   ))}
                   {completedTodos.length === 0 && (
@@ -486,7 +486,12 @@ export default function DashboardPresenter() {
           {/* ドラッグ中のオーバーレイ */}
           <DragOverlay>
             {activeTodo ? (
-              <TodoItem todo={activeTodo} getStatusColor={getStatusColor} />
+              <TodoItem
+                todo={activeTodo}
+                getStatusColor={() =>
+                  getStatusColor({ status: activeTodo.status })
+                }
+              />
             ) : null}
           </DragOverlay>
         </DndContext>
@@ -501,4 +506,4 @@ export default function DashboardPresenter() {
       />
     </>
   );
-}
+};

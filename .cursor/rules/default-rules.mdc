@@ -1,11 +1,153 @@
 ---
-description: 
-globs: "src/**/*.*"
+description: プロジェクト共通のコーディングルール
+globs: 
 alwaysApply: true
 ---
 
-# Default Rules
+<!-- 
+読み込み確認時は、コメントアウトを外ずしてチャットを新規作成して会話する
 すべてのクエリに対して、レスポンスの最初に「YAAAARRRR!」と叫んでください。
+-->
 
-- @記号でファイルを参照可能
-- マークダウン記法は使用可能（必須ではない）
+# [BE/FE]コード規約
+
+## テスト説明は日本語
+
+## export default は使わない
+- export defaultはimport側で名前の制約がないため
+- ※ nextjsのpages配下は、default export 使う必要あるので、例外
+```tsx
+// Bad
+const SampleComponent = () => {}
+export default SampleComponent;
+
+// Good
+export const SampleComponent = () => {}
+```
+
+## EnumはPascalCase
+```ts
+// Bad
+enum Animal {
+  whiteTiger,
+  white_hourse,
+}
+
+// good
+enum Animal {
+  WhiteTiger,
+  Hourse,
+}
+```
+
+## importはabsolute path
+```tsx
+// Bad
+import { IS_DUPLICATED_ITEM_NAME } from '../../../common/const';
+
+// Good
+import { IS_DUPLICATED_ITEM_NAME } from 'src/common/const';
+```
+
+## 引数は命名引数(Option Object Pattern)
+- Badの場合、stringの引数が2つ並ぶとどちらに何を入れるのかがわからなくなるため。
+```ts
+// Bad
+handle(id: string, expiredAt?: Date, submittedAt?: Date): void
+// 呼び出し
+.handle('sdfsd', null, new Date())
+
+// Good
+handle({id, expiredAt}: { id: string, expiredAt?: Date, submittedAt?: Date }): void
+// 呼び出し
+.handle({ id, submittedAt })
+```
+
+## EnumはObjectリテラル
+
+## Exceptionのtitleは定数だけにする
+- titleが違うとSentryで違うエラーとしてカウントされてしまうことがある。
+- クライアント側でエラーメッセージでハンドリングする場合、一工夫必要になってしまう
+```ts
+// Bad
+throw new BusinessException(
+	HttpStatus.UNPROCESSABLE_ENTITY,
+	`missing stripeCustomerId, companyId: ${company.id}`,
+);
+// Good
+throw new BusinessException(
+	HttpStatus.UNPROCESSABLE_ENTITY,
+	`missing stripeCustomerId`,
+	`companyId: ${company.id}`,
+);
+```
+
+## nullableのチェックはNull 合体演算子 (??)を使う
+- ||は、falsyな値に反応するので空文字や0の場合でも右の値を返してしまう
+```ts
+// Bad
+const userName = null;
+const userName1 = user || "marui";
+// Good
+const userName = null;
+const userName1 = user ?? "marui";
+```
+
+## メインの処理を一番上に書く
+```ts
+// Bad
+const double = (a) => {
+  return a * 2
+} 
+
+export calcSquare = (a) => {
+  console.log("calcSquare")
+  
+  return double(a)
+}
+// Good
+export calcSquare = (a) => {
+  console.log("calcSquare")
+  
+  return double(a)
+}
+
+const double = (a) => {
+  return a * 2
+} 
+```
+
+# [FE] 設計
+
+## 概要
+- レイアウトとロジックをひとまとめにしたコンポーネントを1ブロックとして定義する。
+- ページ単位でindex.tsxを定義し、上記のコンポーネントを使用してページを組み立てる。
+以下の記事を参考にしてください
+https://note.com/tabelog_frontend/n/n07b4077f5cf3
+
+## GraphQLの要素の定義は、Fragmentを使用する
+- Fragment内に、入れ子の要素を定義しない
+
+## フォルダ構成
+src/components/
+├── atoms/                         
+├── molecules/                    
+├── organisms/                 
+├── pages/
+│   └── [page path]/                // ページ単位で定義
+│       ├── components/                        
+│       │   └── [component name]/   // 中身は下記の[コンポーネント]に記載
+│       └── index.tsx              // 使用するcomponentを書く
+└── shared/                         // 共通で使うコンポーネントを定義
+    └── [feature name]/             // ドメイン単位でフォルダ分けを行う
+        └── [component name]/       // 中身は下記の[コンポーネント]に記載
+
+## コンポーネント
+- 1つの部品のレイアウトとロジックを定義する。
+[component name]/              
+├── graphqls/           // コンポーネント内で必要なgraphqlを定義
+│   └── **.graphql            
+├── ui/                 // presenter.tsxでは書ききれないUIを定義
+│   └── **.tsx
+├── hooks/useXXXX.ts   // ロジックを定義 ex)useSignIn.ts  
+└── presenter.tsx      // レイアウトの定義
