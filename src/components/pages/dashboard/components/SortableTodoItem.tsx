@@ -1,8 +1,8 @@
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { TodoStatus } from '@/generated/graphql';
-import { Todo } from '@/hooks/useTodos';
-import { TodoItem } from './TodoItem';
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { TodoStatus } from "@/generated/graphql";
+import { Todo } from "@/hooks/useTodos";
+import { TodoItem } from "./TodoItem";
 
 interface SortableTodoItemProps {
   todo: Todo;
@@ -10,7 +10,11 @@ interface SortableTodoItemProps {
   onClick: () => void;
 }
 
-export function SortableTodoItem({ todo, getStatusColor, onClick }: SortableTodoItemProps) {
+export default function SortableTodoItem({
+  todo,
+  getStatusColor,
+  onClick,
+}: SortableTodoItemProps) {
   const {
     attributes,
     listeners,
@@ -27,17 +31,8 @@ export function SortableTodoItem({ todo, getStatusColor, onClick }: SortableTodo
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-    >
-      <TodoItem
-        todo={todo}
-        getStatusColor={getStatusColor}
-        onClick={onClick}
-      />
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <TodoItem todo={todo} getStatusColor={getStatusColor} onClick={onClick} />
     </div>
   );
-} 
+}
