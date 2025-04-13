@@ -50,6 +50,79 @@ const STATUS_MAP = {
   [COLUMN_IDS.COMPLETED]: TodoStatus.Completed,
 };
 
+// ステータスに応じた色を返す関数
+const getStatusColor = (status: TodoStatus) => {
+  switch (status) {
+    case TodoStatus.NotStarted:
+      return "red";
+    case TodoStatus.InProgress:
+      return "blue";
+    case TodoStatus.Completed:
+      return "green";
+    default:
+      return "gray";
+  }
+};
+
+// カラムコンポーネント
+type TodoColumnProps = {
+  id: string;
+  title: string;
+  colorScheme: string;
+  todos: Todo[];
+  onTodoClick: (todo: Todo) => void;
+};
+
+const TodoColumn = ({
+  id,
+  title,
+  colorScheme,
+  todos,
+  onTodoClick,
+}: TodoColumnProps) => (
+  <Box
+    bg="gray.50"
+    p={4}
+    borderRadius="md"
+    boxShadow="sm"
+    id={id}
+    data-droppable="true"
+  >
+    <Heading size="md" mb={4} display="flex" alignItems="center">
+      <Badge colorScheme={colorScheme} mr={2}>
+        {todos.length}
+      </Badge>
+      {title}
+    </Heading>
+    <SortableContext
+      items={todos.map((todo) => todo.id)}
+      strategy={verticalListSortingStrategy}
+      id={id}
+    >
+      <Box minH="200px">
+        {todos.map((todo) => (
+          <SortableTodoItem
+            key={todo.id}
+            todo={todo}
+            getStatusColor={getStatusColor}
+            onClick={() => onTodoClick(todo)}
+          />
+        ))}
+        {todos.length === 0 && (
+          <Flex
+            height="100%"
+            minH="200px"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Text color="gray.500">ここにタスクをドロップ</Text>
+          </Flex>
+        )}
+      </Box>
+    </SortableContext>
+  </Box>
+);
+
 export default function DashboardPresenter() {
   const {
     todos,
@@ -60,12 +133,10 @@ export default function DashboardPresenter() {
     deleteTodo,
   } = useTodos();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const [selectedTodo, setSelectedTodo] = useState<any>(null);
+  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [activeTodoId, setActiveTodoId] = useState<UniqueIdentifier | null>(
     null
   );
-
-  // ドラッグ中の一時的なTodos状態
   const [tempTodos, setTempTodos] = useState<Todo[]>([]);
 
   // 更新をデバウンスするためのタイマー参照
@@ -82,8 +153,21 @@ export default function DashboardPresenter() {
     ? todos.find((todo) => todo.id === activeTodoId)
     : null;
 
+  // ステータスごとにタスクをフィルタリング
+  const todosByStatus = {
+    [TodoStatus.NotStarted]:
+      displayTodos?.filter((todo) => todo.status === TodoStatus.NotStarted) ||
+      [],
+    [TodoStatus.InProgress]:
+      displayTodos?.filter((todo) => todo.status === TodoStatus.InProgress) ||
+      [],
+    [TodoStatus.Completed]:
+      displayTodos?.filter((todo) => todo.status === TodoStatus.Completed) ||
+      [],
+  };
+
   // カスタム衝突判定 - 空のカラムへのドロップを適切に処理
-  const detectCollision: CollisionDetection = (args) => {
+  const detectCollision: CollisionDetection = useCallback((args) => {
     // 基本の衝突判定を取得
     const cornerCollisions = closestCorners(args);
 
@@ -119,7 +203,7 @@ export default function DashboardPresenter() {
     }
 
     return containerCollisions;
-  };
+  }, []);
 
   // デバウンス処理付きのステータス更新
   const debouncedUpdateStatus = useCallback(
@@ -155,178 +239,124 @@ export default function DashboardPresenter() {
   );
 
   // ドラッグ開始時の処理
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    setActiveTodoId(active.id);
+  const handleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      const { active } = event;
+      setActiveTodoId(active.id);
 
-    // ドラッグ開始時にtempTodosを初期化
-    setTempTodos([...todos]);
+      // ドラッグ開始時にtempTodosを初期化
+      setTempTodos([...todos]);
 
-    // リファレンスをリセット
-    lastUpdatedStatusRef.current = null;
-    if (updateTimerRef.current) {
-      clearTimeout(updateTimerRef.current);
-      updateTimerRef.current = null;
-    }
-  };
+      // リファレンスをリセット
+      lastUpdatedStatusRef.current = null;
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current);
+        updateTimerRef.current = null;
+      }
+    },
+    [todos]
+  );
 
   // ドラッグ終了時の処理
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
 
-    setActiveTodoId(null);
+      setActiveTodoId(null);
+      setTempTodos([]);
 
-    // 一時的なTodos状態をクリア
-    setTempTodos([]);
-
-    // タイマーをクリア
-    if (updateTimerRef.current) {
-      clearTimeout(updateTimerRef.current);
-      updateTimerRef.current = null;
-    }
-
-    // ドロップ先がない場合は何もしない
-    if (!over) return;
-
-    // 同じ要素にドロップした場合は何もしない
-    if (active.id === over.id) return;
-
-    console.log("ドロップ先:", over.id);
-
-    // ドロップ先のカラムIDを取得
-    const overId = String(over.id);
-
-    // カラムにドロップした場合
-    if (Object.values(COLUMN_IDS).includes(overId)) {
-      const todoId = String(active.id);
-      let newStatus: TodoStatus;
-
-      // ステータスの変換
-      switch (overId) {
-        case COLUMN_IDS.NOT_STARTED:
-          newStatus = TodoStatus.NotStarted;
-          break;
-        case COLUMN_IDS.IN_PROGRESS:
-          newStatus = TodoStatus.InProgress;
-          break;
-        case COLUMN_IDS.COMPLETED:
-          newStatus = TodoStatus.Completed;
-          break;
-        default:
-          return;
+      // タイマーをクリア
+      if (updateTimerRef.current) {
+        clearTimeout(updateTimerRef.current);
+        updateTimerRef.current = null;
       }
 
-      // ドラッグ中に既に更新済みなら再度更新しない
-      if (lastUpdatedStatusRef.current === newStatus) {
-        console.log("既にステータスが更新済みです:", newStatus);
-        return;
-      }
+      // ドロップ先がない場合は何もしない
+      if (!over || active.id === over.id) return;
 
-      // ステータス更新
-      try {
-        await updateTodoStatus(todoId, newStatus);
-        console.log(`Todoステータスを更新しました: ${todoId} => ${newStatus}`);
-      } catch (error) {
-        console.error("ステータス更新エラー:", error);
+      // ドロップ先のカラムIDを取得
+      const overId = String(over.id);
+
+      // カラムにドロップした場合
+      if (Object.values(COLUMN_IDS).includes(overId)) {
+        const todoId = String(active.id);
+        const newStatus = STATUS_MAP[overId as keyof typeof STATUS_MAP];
+
+        // ドラッグ中に既に更新済みなら再度更新しない
+        if (lastUpdatedStatusRef.current === newStatus) return;
+
+        // ステータス更新
+        try {
+          await updateTodoStatus(todoId, newStatus);
+        } catch (error) {
+          console.error("ステータス更新エラー:", error);
+        }
       }
-    }
-  };
+    },
+    [updateTodoStatus]
+  );
 
   // ドラッグオーバー時の処理
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
+  const handleDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const { active, over } = event;
 
-    // ドロップ先がない場合は何もしない
-    if (!over) return;
+      // ドロップ先がない場合または同じ要素の場合は何もしない
+      if (!over || active.id === over.id) return;
 
-    // 同じ要素の場合は何もしない
-    if (active.id === over.id) return;
+      const overId = String(over.id);
+      const activeId = String(active.id);
 
-    // ドロップ先のIDを取得
-    const overId = String(over.id);
-    const activeId = String(active.id);
+      // ドラッグ中のTodoを取得
+      const activeTodoItem = tempTodos.find((todo) => todo.id === activeId);
+      if (!activeTodoItem) return;
 
-    // ドラッグ中のTodoを取得
-    const activeTodoItem = tempTodos.find((todo) => todo.id === activeId);
-    if (!activeTodoItem) return;
+      const currentStatus = activeTodoItem.status;
 
-    const currentStatus = activeTodoItem.status;
+      // カラム上またはTodo上にドラッグした場合の処理
+      let newStatus: TodoStatus | undefined;
 
-    // カラム（ステータス）上にドラッグした場合
-    if (Object.values(COLUMN_IDS).includes(overId)) {
-      const newStatus = STATUS_MAP[overId as keyof typeof STATUS_MAP];
+      // カラム上にドラッグした場合
+      if (Object.values(COLUMN_IDS).includes(overId)) {
+        newStatus = STATUS_MAP[overId as keyof typeof STATUS_MAP];
+      } else {
+        // 別のTodoアイテムの上にドラッグした場合
+        const overTodo = tempTodos.find((todo) => todo.id === overId);
+        if (overTodo && currentStatus !== overTodo.status) {
+          newStatus = overTodo.status;
+        }
+      }
 
-      // 既に同じステータスならスキップ
-      if (currentStatus === newStatus) return;
+      // ステータスが変わる場合のみ更新
+      if (newStatus && currentStatus !== newStatus) {
+        // UIの即時更新
+        setTempTodos((prev) =>
+          prev.map((todo) =>
+            todo.id === activeId ? { ...todo, status: newStatus } : todo
+          )
+        );
 
-      console.log(`カラム上にドラッグ: ${activeId} => ${newStatus}`);
+        // APIの更新はデバウンス処理
+        debouncedUpdateStatus(activeId, newStatus);
+      }
+    },
+    [tempTodos, debouncedUpdateStatus]
+  );
 
-      // UIの即時更新のためにtempTodosを更新
-      setTempTodos((prev) =>
-        prev.map((todo) =>
-          todo.id === activeId ? { ...todo, status: newStatus } : todo
-        )
-      );
-
-      // APIの更新はデバウンス処理
-      debouncedUpdateStatus(activeId, newStatus);
-      return;
-    }
-
-    // 別のTodoアイテムの上にドラッグした場合
-    const overTodo = tempTodos.find((todo) => todo.id === overId);
-    if (!overTodo) return;
-
-    // 異なるステータスのTodo上にドラッグした場合
-    if (currentStatus !== overTodo.status) {
-      const newStatus = overTodo.status;
-
-      console.log(`別のTodo上にドラッグ: ${activeId} => ${newStatus}`);
-
-      // UIの即時更新のためにtempTodosを更新
-      setTempTodos((prev) =>
-        prev.map((todo) =>
-          todo.id === activeId ? { ...todo, status: newStatus } : todo
-        )
-      );
-
-      // APIの更新はデバウンス処理
-      debouncedUpdateStatus(activeId, newStatus);
-    }
-  };
-
-  const handleAddTodo = () => {
+  const handleAddTodo = useCallback(() => {
     setSelectedTodo(null);
     onOpen();
-  };
+  }, [onOpen]);
 
-  const handleEditTodo = (todo: any) => {
-    setSelectedTodo(todo);
-    onOpen();
-  };
+  const handleEditTodo = useCallback(
+    (todo: Todo) => {
+      setSelectedTodo(todo);
+      onOpen();
+    },
+    [onOpen]
+  );
 
-  // ステータスごとにタスクをフィルタリング
-  const notStartedTodos =
-    displayTodos?.filter((todo) => todo.status === TodoStatus.NotStarted) || [];
-  const inProgressTodos =
-    displayTodos?.filter((todo) => todo.status === TodoStatus.InProgress) || [];
-  const completedTodos =
-    displayTodos?.filter((todo) => todo.status === TodoStatus.Completed) || [];
-
-  // ステータスに応じた色を返す関数
-  const getStatusColor = (status: TodoStatus) => {
-    switch (status) {
-      case TodoStatus.NotStarted:
-        return "red";
-      case TodoStatus.InProgress:
-        return "blue";
-      case TodoStatus.Completed:
-        return "green";
-      default:
-        return "gray";
-    }
-  };
-
+  // ローディング状態
   if (loading) {
     return <Box p={4}>タスクを読み込み中...</Box>;
   }
@@ -353,134 +383,29 @@ export default function DashboardPresenter() {
           onDragOver={handleDragOver}
         >
           <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-            {/* 未対応カラム */}
-            <Box
-              bg="gray.50"
-              p={4}
-              borderRadius="md"
-              boxShadow="sm"
+            <TodoColumn
               id={COLUMN_IDS.NOT_STARTED}
-              data-droppable="true"
-            >
-              <Heading size="md" mb={4} display="flex" alignItems="center">
-                <Badge colorScheme="red" mr={2}>
-                  {notStartedTodos.length}
-                </Badge>
-                未対応
-              </Heading>
-              <SortableContext
-                items={notStartedTodos.map((todo) => todo.id)}
-                strategy={verticalListSortingStrategy}
-                id={COLUMN_IDS.NOT_STARTED}
-              >
-                <Box minH="200px">
-                  {notStartedTodos.map((todo) => (
-                    <SortableTodoItem
-                      key={todo.id}
-                      todo={todo}
-                      getStatusColor={getStatusColor}
-                      onClick={() => handleEditTodo(todo)}
-                    />
-                  ))}
-                  {notStartedTodos.length === 0 && (
-                    <Flex
-                      height="100%"
-                      minH="200px"
-                      alignItems="center"
-                      justifyContent="center"
-                    >
-                      <Text color="gray.500">ここにタスクをドロップ</Text>
-                    </Flex>
-                  )}
-                </Box>
-              </SortableContext>
-            </Box>
+              title="未対応"
+              colorScheme="red"
+              todos={todosByStatus[TodoStatus.NotStarted]}
+              onTodoClick={handleEditTodo}
+            />
 
-            {/* 作業中カラム */}
-            <Box
-              bg="gray.50"
-              p={4}
-              borderRadius="md"
-              boxShadow="sm"
+            <TodoColumn
               id={COLUMN_IDS.IN_PROGRESS}
-              data-droppable="true"
-            >
-              <Heading size="md" mb={4} display="flex" alignItems="center">
-                <Badge colorScheme="blue" mr={2}>
-                  {inProgressTodos.length}
-                </Badge>
-                作業中
-              </Heading>
-              <SortableContext
-                items={inProgressTodos.map((todo) => todo.id)}
-                strategy={verticalListSortingStrategy}
-                id={COLUMN_IDS.IN_PROGRESS}
-              >
-                <Box minH="200px">
-                  {inProgressTodos.map((todo) => (
-                    <SortableTodoItem
-                      key={todo.id}
-                      todo={todo}
-                      getStatusColor={getStatusColor}
-                      onClick={() => handleEditTodo(todo)}
-                    />
-                  ))}
-                  {inProgressTodos.length === 0 && (
-                    <Flex
-                      height="100%"
-                      minH="200px"
-                      alignItems="center"
-                      justifyContent="center"
-                    >
-                      <Text color="gray.500">ここにタスクをドロップ</Text>
-                    </Flex>
-                  )}
-                </Box>
-              </SortableContext>
-            </Box>
+              title="作業中"
+              colorScheme="blue"
+              todos={todosByStatus[TodoStatus.InProgress]}
+              onTodoClick={handleEditTodo}
+            />
 
-            {/* 完了カラム */}
-            <Box
-              bg="gray.50"
-              p={4}
-              borderRadius="md"
-              boxShadow="sm"
+            <TodoColumn
               id={COLUMN_IDS.COMPLETED}
-              data-droppable="true"
-            >
-              <Heading size="md" mb={4} display="flex" alignItems="center">
-                <Badge colorScheme="green" mr={2}>
-                  {completedTodos.length}
-                </Badge>
-                完了
-              </Heading>
-              <SortableContext
-                items={completedTodos.map((todo) => todo.id)}
-                strategy={verticalListSortingStrategy}
-                id={COLUMN_IDS.COMPLETED}
-              >
-                <Box minH="200px">
-                  {completedTodos.map((todo) => (
-                    <SortableTodoItem
-                      key={todo.id}
-                      todo={todo}
-                      getStatusColor={getStatusColor}
-                      onClick={() => handleEditTodo(todo)}
-                    />
-                  ))}
-                  {completedTodos.length === 0 && (
-                    <Flex
-                      height="100%"
-                      minH="200px"
-                      alignItems="center"
-                      justifyContent="center"
-                    >
-                      <Text color="gray.500">ここにタスクをドロップ</Text>
-                    </Flex>
-                  )}
-                </Box>
-              </SortableContext>
-            </Box>
+              title="完了"
+              colorScheme="green"
+              todos={todosByStatus[TodoStatus.Completed]}
+              onTodoClick={handleEditTodo}
+            />
           </SimpleGrid>
 
           {/* ドラッグ中のオーバーレイ */}
