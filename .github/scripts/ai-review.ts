@@ -22,7 +22,7 @@ const PROMPT_CLASSIFICATION_PATH = join(
   "classification_prompt.md"
 );
 const FE_GUIDELINES_PATH = join(PROJECT_ROOT, "..", "copilot-instructions.md");
-const INDEX_PATH = join(PROJECT_ROOT, "..", "indexes");
+// const INDEX_PATH = join(PROJECT_ROOT, "..", "indexes");
 
 /**
  * ファイルを読み込む関数
