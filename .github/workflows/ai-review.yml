@@ -1,0 +1,61 @@
+name: AI コードレビュー
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  ai-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: リポジトリのチェックアウト
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # すべての履歴を取得して差分をとれるようにする
+
+      - name: Node.js のセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 依存関係のインストール
+        run: |
+          npm install dotenv openai @llamaindex/openai @octokit/rest
+
+      - name: ディレクトリ構造の確認
+        run: |
+          echo "プロンプトファイルとスクリプトの確認..."
+          ls -la .github/prompts/
+          ls -la .github/scripts/
+
+      - name: 環境変数の確認
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "環境変数のチェック..."
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "エラー: OPENAI_API_KEYがセットされていません"
+            exit 1
+          fi
+          echo "OPENAI_API_KEYがセットされています"
+
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "エラー: GITHUB_TOKENがセットされていません"
+            exit 1
+          fi
+          echo "GITHUB_TOKENがセットされています"
+
+      - name: AI レビューの実行
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "AIレビュースクリプトを実行しています..."
+          npx ts-node .github/scripts/ai-review.ts

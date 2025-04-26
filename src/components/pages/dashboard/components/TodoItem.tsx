@@ -1,6 +1,7 @@
-import { Box, Flex, Text, Badge } from '@chakra-ui/react';
-import { TodoStatus } from '@/generated/graphql';
-import { Todo } from '@/hooks/useTodos';
+import { Box, Flex, Text, Badge } from "@chakra-ui/react";
+import { TodoStatus } from "@/generated/graphql";
+import { Todo } from "@/hooks/useTodos";
+import { useStatusHelpers } from "@/components/pages/dashboard/hooks/useStatusHelpers";
 
 interface TodoItemProps {
   todo: Todo;
@@ -9,19 +10,7 @@ interface TodoItemProps {
 }
 
 export function TodoItem({ todo, getStatusColor, onClick }: TodoItemProps) {
-  // ステータスに応じたラベルを返す関数
-  const getStatusLabel = (status: TodoStatus) => {
-    switch (status) {
-      case TodoStatus.NotStarted:
-        return '未対応';
-      case TodoStatus.InProgress:
-        return '作業中';
-      case TodoStatus.Completed:
-        return '完了';
-      default:
-        return '';
-    }
-  };
+  const { getStatusLabel } = useStatusHelpers();
 
   return (
     <Box
@@ -44,4 +33,4 @@ export function TodoItem({ todo, getStatusColor, onClick }: TodoItemProps) {
       </Text>
     </Box>
   );
-} 
+}
