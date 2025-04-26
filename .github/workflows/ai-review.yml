@@ -26,11 +26,16 @@ jobs:
 
       - name: 依存関係のインストール
         run: |
-          npm install dotenv openai @llamaindex/openai @octokit/rest ts-node typescript @types/node
+          npm install dotenv openai @llamaindex/openai @octokit/rest 
+          npm install -D tsx typescript @types/node
 
       - name: ディレクトリ構造の確認
         run: |
           echo "プロンプトファイルとスクリプトの確認..."
+          mkdir -p .github/prompts .github/indexes
+          touch .github/prompts/code_review_prompt.md
+          touch .github/prompts/classification_prompt.md
+          touch .github/copilot-instructions.md
           ls -la .github/prompts/
           ls -la .github/scripts/
 
@@ -58,4 +63,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "AIレビュースクリプトを実行しています..."
-          npx ts-node .github/scripts/ai-review.ts
+          npx tsx .github/scripts/ai-review.ts
