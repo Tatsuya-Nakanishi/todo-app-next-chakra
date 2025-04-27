@@ -86,8 +86,8 @@ jobs:
 
       - name: requirements.txtの作成
         run: |
-          echo "openai==1.12.0" > requirements.txt
-          echo "llama-index==0.10.0" >> requirements.txt
+          echo "openai==0.28.1" > requirements.txt
+          echo "llama-index==0.8.0" >> requirements.txt
           echo "requests==2.31.0" >> requirements.txt
 
       - name: Python のセットアップ
@@ -128,9 +128,9 @@ jobs:
           fi
           echo "REVIEW_GITHUB_TOKENがセットされています"
 
-      - name: モデル名の修正
-        run: |
-          sed -i 's/model="gpt-4.1"/model="gpt-4o"/g' .github/scripts/ai-review.py
+      # - name: モデル名の修正
+      #   run: |
+      #     sed -i 's/model="gpt-4.1"/model="gpt-4o"/g' .github/scripts/ai-review.py
 
       - name: AI レビューの実行
         env:
