@@ -84,6 +84,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: requirements.txtの作成
+        run: |
+          echo "openai==1.12.0" > requirements.txt
+          echo "llama-index==0.10.0" >> requirements.txt
+          echo "requests==2.31.0" >> requirements.txt
+
       - name: Python のセットアップ
         uses: actions/setup-python@v4
         with:
@@ -92,7 +98,7 @@ jobs:
 
       - name: 依存関係のインストール
         run: |
-          pip install openai llama_index requests
+          pip install -r requirements.txt
 
       - name: ディレクトリ構造の確認
         run: |
