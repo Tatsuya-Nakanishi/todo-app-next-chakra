@@ -1,3 +1,69 @@
+# name: AI コードレビュー
+
+# on:
+#   pull_request:
+#     types: [opened, synchronize, reopened]
+#     branches: [main]
+
+# permissions:
+#   contents: read
+#   pull-requests: write
+
+# jobs:
+#   ai-review:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: リポジトリのチェックアウト
+#         uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0
+
+#       - name: Node.js のセットアップ
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: "20"
+#           cache: "npm"
+
+#       - name: 依存関係のインストール
+#         run: |
+#           npm install dotenv openai @llamaindex/openai @octokit/rest
+#           npm install -D tsx typescript @types/node
+
+#       - name: ディレクトリ構造の確認
+#         run: |
+#           echo "プロンプトファイルとスクリプトの確認..."
+#           mkdir -p .github/prompts .github/indexes
+#           touch .github/prompts/code_review_prompt.md
+#           touch .github/prompts/classification_prompt.md
+#           touch .github/copilot-instructions.md
+#           ls -la .github/prompts/
+#           ls -la .github/scripts/
+
+#       - name: 環境変数の確認
+#         env:
+#           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         run: |
+#           echo "環境変数のチェック..."
+#           if [ -z "$OPENAI_API_KEY" ]; then
+#             echo "エラー: OPENAI_API_KEYがセットされていません"
+#             exit 1
+#           fi
+#           echo "OPENAI_API_KEYがセットされています"
+
+#           if [ -z "$GITHUB_TOKEN" ]; then
+#             echo "エラー: GITHUB_TOKENがセットされていません"
+#             exit 1
+#           fi
+#           echo "GITHUB_TOKENがセットされています"
+
+#       - name: AI レビューの実行
+#         env:
+#           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         run: |
+#           echo "AIレビュースクリプトを実行しています..."
+#           npx tsx .github/scripts/ai-review.ts
 name: AI コードレビュー
 
 on:
@@ -18,31 +84,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Node.js のセットアップ
-        uses: actions/setup-node@v4
+      - name: Python のセットアップ
+        uses: actions/setup-python@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          python-version: "3.10"
+          cache: "pip"
 
       - name: 依存関係のインストール
         run: |
-          npm install dotenv openai @llamaindex/openai @octokit/rest 
-          npm install -D tsx typescript @types/node
+          pip install openai llama_index requests
 
       - name: ディレクトリ構造の確認
         run: |
           echo "プロンプトファイルとスクリプトの確認..."
-          mkdir -p .github/prompts .github/indexes
+          mkdir -p .github/prompts .github/indexes .github/doc
           touch .github/prompts/code_review_prompt.md
           touch .github/prompts/classification_prompt.md
-          touch .github/copilot-instructions.md
+          touch .github/doc/code-guidelines.md
           ls -la .github/prompts/
           ls -la .github/scripts/
 
       - name: 環境変数の確認
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "環境変数のチェック..."
           if [ -z "$OPENAI_API_KEY" ]; then
@@ -51,16 +116,22 @@ jobs:
           fi
           echo "OPENAI_API_KEYがセットされています"
 
-          if [ -z "$GITHUB_TOKEN" ]; then
-            echo "エラー: GITHUB_TOKENがセットされていません"
+          if [ -z "$REVIEW_GITHUB_TOKEN" ]; then
+            echo "エラー: REVIEW_GITHUB_TOKENがセットされていません"
             exit 1
           fi
-          echo "GITHUB_TOKENがセットされています"
+          echo "REVIEW_GITHUB_TOKENがセットされています"
+
+      - name: モデル名の修正
+        run: |
+          sed -i 's/model="gpt-4.1"/model="gpt-4o"/g' .github/scripts/ai-review.py
 
       - name: AI レビューの実行
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
         run: |
           echo "AIレビュースクリプトを実行しています..."
-          npx tsx .github/scripts/ai-review.ts
+          python .github/scripts/ai-review.py
