@@ -12,7 +12,7 @@ import re
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PROMPT_TEMPLATE_PATH = PROJECT_ROOT / "prompts/code_review_prompt.md"
 PROMPT_CLASSIFICATION_PATH = PROJECT_ROOT / "prompts/classification_prompt.md"
-GUIDELINES_PATH = PROJECT_ROOT / "doc/code-guidelines.md"
+GUIDELINES_PATH = PROJECT_ROOT / "copilot-instructions.md"
 INDEX_PATH = PROJECT_ROOT / "indexes"
 
 def load_file(file_path):
@@ -30,7 +30,8 @@ def load_index():
         print("Index loaded successfully.")
         return index
     except Exception as e:
-        print(f"Error loading index: {e}")
+        print(f"Warning: Error loading index: {e}")
+        print("Continuing without index...")
         return None
 
 def split_diff_by_file(diff_text):
@@ -129,8 +130,9 @@ def main():
         return
 
     index = load_index()
-    if not index:
-        return
+    # インデックスがなくても処理を続行
+    # if not index:
+    #     return
 
     Settings.llm = LlamaOpenAI(api_key=OPENAI_API_KEY, temperature=0.0)
     Settings.chunk_size = 1024
@@ -139,15 +141,21 @@ def main():
     file_reviews_map = {}
 
     for filename, filediff in file_diff_map.items():
-        query = (
-            f"Below is the diff of file '{filename}'. "
-            "Please give me the relevant code guidelines in Japanese:\n"
-            f"{filediff}"
-        )
         try:
-            response = query_engine.query(query)
-            retrieved_guidelines = str(response)
-
+            # インデックスがあればクエリを実行、なければガイドラインを直接使用
+            if index:
+                query = (
+                    f"Below is the diff of file '{filename}'. "
+                    "Please give me the relevant code guidelines in Japanese:\n"
+                    f"{filediff}"
+                )
+                response = query_engine.query(query)
+                retrieved_guidelines = str(response)
+            else:
+                # インデックスがない場合はガイドラインをそのまま使用
+                guidelines = load_file(GUIDELINES_PATH)
+                retrieved_guidelines = guidelines if guidelines else "No guidelines available."
+            
             prompt = prompt_template.format(
                 diff_text=filediff,
                 code_guidelines=retrieved_guidelines
@@ -155,7 +163,7 @@ def main():
             file_review = generate_review(client, prompt)
             file_reviews_map[filename] = file_review
         except Exception as e:
-            print(f"Error querying LlamaIndex: {e}")
+            print(f"Error processing file {filename}: {e}")
             file_reviews_map[filename] = "Failed to generate review."
 
     review_content = "Nakamura Code Rabbit Review\n# Issues and Fix Suggestions\n"
