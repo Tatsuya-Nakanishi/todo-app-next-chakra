@@ -130,20 +130,33 @@ def main():
         return
 
     index = load_index()
-    # インデックスがなくても処理を続行
-    # if not index:
-    #     return
-
-    Settings.llm = LlamaOpenAI(api_key=OPENAI_API_KEY, temperature=0.0)
-    Settings.chunk_size = 1024
-    query_engine = index.as_query_engine()
-
-    file_reviews_map = {}
-
-    for filename, filediff in file_diff_map.items():
-        try:
-            # インデックスがあればクエリを実行、なければガイドラインを直接使用
-            if index:
+    # インデックスがない場合
+    if not index:
+        file_reviews_map = {}
+        for filename, filediff in file_diff_map.items():
+            try:
+                # インデックスがない場合はガイドラインを直接使用
+                guidelines = load_file(GUIDELINES_PATH)
+                retrieved_guidelines = guidelines if guidelines else "No guidelines available."
+                
+                prompt = prompt_template.format(
+                    diff_text=filediff,
+                    code_guidelines=retrieved_guidelines
+                )
+                file_review = generate_review(client, prompt)
+                file_reviews_map[filename] = file_review
+            except Exception as e:
+                print(f"Error processing file {filename}: {e}")
+                file_reviews_map[filename] = "Failed to generate review."
+    else:
+        # インデックスがある場合
+        Settings.llm = LlamaOpenAI(api_key=OPENAI_API_KEY, temperature=0.0)
+        Settings.chunk_size = 1024
+        query_engine = index.as_query_engine()
+        
+        file_reviews_map = {}
+        for filename, filediff in file_diff_map.items():
+            try:
                 query = (
                     f"Below is the diff of file '{filename}'. "
                     "Please give me the relevant code guidelines in Japanese:\n"
@@ -151,20 +164,16 @@ def main():
                 )
                 response = query_engine.query(query)
                 retrieved_guidelines = str(response)
-            else:
-                # インデックスがない場合はガイドラインをそのまま使用
-                guidelines = load_file(GUIDELINES_PATH)
-                retrieved_guidelines = guidelines if guidelines else "No guidelines available."
-            
-            prompt = prompt_template.format(
-                diff_text=filediff,
-                code_guidelines=retrieved_guidelines
-            )
-            file_review = generate_review(client, prompt)
-            file_reviews_map[filename] = file_review
-        except Exception as e:
-            print(f"Error processing file {filename}: {e}")
-            file_reviews_map[filename] = "Failed to generate review."
+                
+                prompt = prompt_template.format(
+                    diff_text=filediff,
+                    code_guidelines=retrieved_guidelines
+                )
+                file_review = generate_review(client, prompt)
+                file_reviews_map[filename] = file_review
+            except Exception as e:
+                print(f"Error processing file {filename}: {e}")
+                file_reviews_map[filename] = "Failed to generate review."
 
     review_content = "Nakamura Code Rabbit Review\n# Issues and Fix Suggestions\n"
     for filename, review_text in file_reviews_map.items():
