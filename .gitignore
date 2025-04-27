@@ -50,3 +50,6 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
+# Cursor設定
+.cursor/mcp.json
+
