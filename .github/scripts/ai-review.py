@@ -175,7 +175,7 @@ def main():
                 print(f"Error processing file {filename}: {e}")
                 file_reviews_map[filename] = "Failed to generate review."
 
-    review_content = "Nakamura Code Rabbit Review\n# Issues and Fix Suggestions\n"
+    review_content = "コードレビューを行いました。\n# 修正点と提案\n"
     for filename, review_text in file_reviews_map.items():
         review_content += f"\n### {filename}\n{review_text}\n"
 
